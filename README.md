@@ -1,78 +1,94 @@
-<p align="center">
-  <a href="https://pi.dev">
-    <img alt="pi logo" src="https://pi.dev/logo-auto.svg" width="128">
-  </a>
-</p>
-<p align="center">
-  <a href="https://discord.com/invite/3cU7Bz4UPx"><img alt="Discord" src="https://img.shields.io/badge/discord-community-5865F2?style=flat-square&logo=discord&logoColor=white" /></a>
-</p>
-<p align="center">
-  <a href="https://pi.dev">pi.dev</a> domain graciously donated by
-  <br /><br />
-  <a href="https://exe.dev"><img src="packages/coding-agent/docs/images/exy.png" alt="Exy mascot" width="48" /><br />exe.dev</a>
-</p>
+# Pi Security Fork
 
-> New issues and PRs from new contributors are auto-closed by default. Maintainers review auto-closed issues daily. See [CONTRIBUTING.md](CONTRIBUTING.md).
+Fork especializado de `earendil-works/pi` orientado a operaciones de seguridad con perfiles separados para:
 
----
+- SOC
+- Blue Team
+- Red Team
 
-# Pi Agent Harness Mono Repo
+## Atribución
 
-This is the home of the pi agent harness project including our self extensible coding agent.
+Este proyecto es un fork de [earendil-works/pi](https://github.com/earendil-works/pi).
 
-* **[@earendil-works/pi-coding-agent](packages/coding-agent)**: Interactive coding agent CLI
-* **[@earendil-works/pi-agent-core](packages/agent)**: Agent runtime with tool calling and state management
-* **[@earendil-works/pi-ai](packages/ai)**: Unified multi-provider LLM API (OpenAI, Anthropic, Google, …)
+- Upstream original: `earendil-works/pi`
+- Fork mantenido por: [`rortizs`](https://github.com/rortizs)
 
-To learn more about pi:
+La licencia original se mantiene en [`LICENSE`](LICENSE).
 
-* [Visit pi.dev](https://pi.dev), the project website with demos
-* [Read the documentation](https://pi.dev/docs/latest), but you can also ask the agent to explain itself
+## Objetivo
 
-## Share your OSS coding agent sessions
+La meta de este fork es convertir Pi + Gentle-AI + Engram en una plataforma especializada para seguridad, evitando el modelo de “agente genérico que hace de todo”.
 
-If you use pi or other coding agents for open source work, please share your sessions.
+La arquitectura buscada separa dominios, evidencia, memoria y políticas operativas.
 
-Public OSS session data helps improve coding agents with real-world tasks, tool use, failures, and fixes instead of toy benchmarks.
+## Problema que resuelve
 
-For the full explanation, see [this post on X](https://x.com/badlogicgames/status/2037811643774652911).
+Los agentes generalistas ayudan, pero en seguridad mezclan demasiadas responsabilidades:
 
-To publish sessions, use [`badlogic/pi-share-hf`](https://github.com/badlogic/pi-share-hf). Read its README.md for setup instructions. All you need is a Hugging Face account, the Hugging Face CLI, and `pi-share-hf`.
+- triage
+- investigación
+- hardening
+- emulación ofensiva
+- reporting
 
-You can also watch [this video](https://x.com/badlogicgames/status/2041151967695634619), where I show how I publish my `pi-mono` sessions.
+Eso degrada trazabilidad, control y mantenibilidad.
 
-I regularly publish my own `pi-mono` work sessions here:
+## Principios
 
-- [badlogicgames/pi-mono on Hugging Face](https://huggingface.co/datasets/badlogicgames/pi-mono)
+- evidencia antes que narrativa
+- humano en control
+- especialización por dominio
+- memoria persistente con criterio
+- guardrails fuertes por defecto
 
-## All Packages
+## Perfiles objetivo
 
-| Package | Description |
-|---------|-------------|
-| **[@earendil-works/pi-ai](packages/ai)** | Unified multi-provider LLM API (OpenAI, Anthropic, Google, etc.) |
-| **[@earendil-works/pi-agent-core](packages/agent)** | Agent runtime with tool calling and state management |
-| **[@earendil-works/pi-coding-agent](packages/coding-agent)** | Interactive coding agent CLI |
-| **[@earendil-works/pi-tui](packages/tui)** | Terminal UI library with differential rendering |
-| **[@earendil-works/pi-web-ui](packages/web-ui)** | Web components for AI chat interfaces |
+| Perfil | Objetivo |
+|--------|----------|
+| SOC | triage, correlación, severidad, escalamiento |
+| Blue Team | detección, hunting, hardening, mejora de cobertura |
+| Red Team | validación ofensiva autorizada, chaining, impacto |
 
-For Slack/chat automation and workflows see [earendil-works/pi-chat](https://github.com/earendil-works/pi-chat).
+## Stack conceptual
 
-## Contributing
+| Componente | Rol |
+|-----------|-----|
+| Pi | runtime principal |
+| Gentle-AI | orquestación, skills, workflows, subagentes |
+| Engram | memoria persistente |
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines and [AGENTS.md](AGENTS.md) for project-specific rules (for both humans and agents).
+## Estado actual
 
-## Development
+Fase de definición documental inicial.
 
-```bash
-npm install          # Install all dependencies
-npm run build        # Build all packages
-npm run check        # Lint, format, and type check
-./test.sh            # Run tests (skips LLM-dependent tests without API keys)
-./pi-test.sh         # Run pi from sources (can be run from any directory)
-```
+Ver documentos base en [`docs/`](docs/README.md):
 
-> **Note:** `npm run check` requires `npm run build` to be run first. The web-ui package uses `tsc` which needs compiled `.d.ts` files from dependencies.
+- visión del fork
+- límites de dominio
+- mapa de agentes
+- policy layer
+- evidence layer
+- requerimientos funcionales
+- requerimientos no funcionales
+- UML inicial
 
-## License
+## Próximos pasos
 
-MIT
+1. consolidar documentación base
+2. bajar requerimientos a arquitectura implementable
+3. diseñar perfiles y agentes especializados
+4. integrar guardrails, evidence layer y memoria especializada
+
+## Desarrollo
+
+Este fork hereda la estructura monorepo de Pi y conserva el upstream como base técnica.
+
+Antes de cambios de implementación, revisar:
+
+- [`AGENTS.md`](AGENTS.md)
+- [`CONTRIBUTING.md`](CONTRIBUTING.md)
+- [`docs/README.md`](docs/README.md)
+
+## Licencia
+
+MIT. Ver [`LICENSE`](LICENSE).

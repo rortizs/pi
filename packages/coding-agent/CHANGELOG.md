@@ -9,6 +9,7 @@
 
 ### Fixed
 
+- Fixed managed `fd` downloads on macOS x86_64 by selecting the newest release that still ships the platform asset instead of assuming the latest release has one ([#4559](https://github.com/earendil-works/pi/issues/4559)).
 - Fixed tool output expansion while extension confirmation dialogs are focused ([#4429](https://github.com/earendil-works/pi/issues/4429)).
 - Fixed auto-retry for Anthropic streams that end before `message_stop` ([#4433](https://github.com/earendil-works/pi/issues/4433)).
 - Fixed theme sharing across package scopes so extensions do not crash with `Theme not initialized` ([#4333](https://github.com/earendil-works/pi/issues/4333)).

@@ -1,6 +1,5 @@
 import chalk from "chalk";
-import { spawnSync } from "child_process";
-import extractZip from "extract-zip";
+import { type SpawnSyncReturns, spawnSync } from "child_process";
 import { chmodSync, createWriteStream, existsSync, mkdirSync, readdirSync, renameSync, rmSync } from "fs";
 import { arch, platform } from "os";
 import { join } from "path";
@@ -23,17 +22,33 @@ interface ToolConfig {
 	repo: string; // GitHub repo (e.g., "sharkdp/fd")
 	binaryName: string; // Name of the binary inside the archive
 	systemBinaryNames?: string[]; // Alternative system command names to try before downloading
-	tagPrefix: string; // Prefix for tags (e.g., "v" for v1.0.0, "" for 1.0.0)
 	getAssetName: (version: string, plat: string, architecture: string) => string | null;
 }
 
-const TOOLS: Record<string, ToolConfig> = {
+type ToolKey = "fd" | "rg";
+
+interface GitHubReleaseAsset {
+	name: string;
+	browser_download_url: string;
+}
+
+interface GitHubRelease {
+	tag_name: string;
+	assets: GitHubReleaseAsset[];
+}
+
+interface ToolReleaseAsset {
+	version: string;
+	assetName: string;
+	downloadUrl: string;
+}
+
+const TOOLS: Record<ToolKey, ToolConfig> = {
 	fd: {
 		name: "fd",
 		repo: "sharkdp/fd",
 		binaryName: "fd",
 		systemBinaryNames: ["fd", "fdfind"],
-		tagPrefix: "v",
 		getAssetName: (version, plat, architecture) => {
 			if (plat === "darwin") {
 				const archStr = architecture === "arm64" ? "aarch64" : "x86_64";
@@ -52,7 +67,6 @@ const TOOLS: Record<string, ToolConfig> = {
 		name: "ripgrep",
 		repo: "BurntSushi/ripgrep",
 		binaryName: "rg",
-		tagPrefix: "",
 		getAssetName: (version, plat, architecture) => {
 			if (plat === "darwin") {
 				const archStr = architecture === "arm64" ? "aarch64" : "x86_64";
@@ -83,7 +97,7 @@ function commandExists(cmd: string): boolean {
 }
 
 // Get the path to a tool (system-wide or in our tools dir)
-export function getToolPath(tool: "fd" | "rg"): string | null {
+export function getToolPath(tool: ToolKey): string | null {
 	const config = TOOLS[tool];
 	if (!config) return null;
 
@@ -104,9 +118,40 @@ export function getToolPath(tool: "fd" | "rg"): string | null {
 	return null;
 }
 
-// Fetch latest release version from GitHub
-async function getLatestVersion(repo: string): Promise<string> {
-	const response = await fetch(`https://api.github.com/repos/${repo}/releases/latest`, {
+export function selectToolReleaseAsset(
+	tool: ToolKey,
+	plat: string,
+	architecture: string,
+	releases: GitHubRelease[],
+): ToolReleaseAsset | null {
+	const config = TOOLS[tool];
+
+	for (const release of releases) {
+		const version = release.tag_name.replace(/^v/, "");
+		const assetName = config.getAssetName(version, plat, architecture);
+		if (!assetName) {
+			continue;
+		}
+
+		const asset = release.assets.find((candidate) => candidate.name === assetName);
+		if (!asset) {
+			continue;
+		}
+
+		return {
+			version,
+			assetName,
+			downloadUrl: asset.browser_download_url,
+		};
+	}
+
+	return null;
+}
+
+// Fetch the newest release asset that supports the current platform.
+async function getReleaseAsset(tool: ToolKey, plat: string, architecture: string): Promise<ToolReleaseAsset> {
+	const config = TOOLS[tool];
+	const response = await fetch(`https://api.github.com/repos/${config.repo}/releases?per_page=20`, {
 		headers: { "User-Agent": `${APP_NAME}-coding-agent` },
 		signal: AbortSignal.timeout(NETWORK_TIMEOUT_MS),
 	});
@@ -115,8 +160,13 @@ async function getLatestVersion(repo: string): Promise<string> {
 		throw new Error(`GitHub API error: ${response.status}`);
 	}
 
-	const data = (await response.json()) as { tag_name: string };
-	return data.tag_name.replace(/^v/, "");
+	const releases = (await response.json()) as GitHubRelease[];
+	const asset = selectToolReleaseAsset(tool, plat, architecture, releases);
+	if (!asset) {
+		throw new Error(`No ${config.name} release asset found for ${plat}/${architecture}`);
+	}
+
+	return asset;
 }
 
 // Download a file from URL
@@ -159,27 +209,102 @@ function findBinaryRecursively(rootDir: string, binaryFileName: string): string 
 	return null;
 }
 
+function formatSpawnFailure(result: SpawnSyncReturns<Buffer>): string {
+	if (result.error?.message) {
+		return result.error.message;
+	}
+	const stderr = result.stderr?.toString().trim();
+	if (stderr) {
+		return stderr;
+	}
+	const stdout = result.stdout?.toString().trim();
+	if (stdout) {
+		return stdout;
+	}
+	return `exit status ${result.status ?? "unknown"}`;
+}
+
+function runExtractionCommand(command: string, args: string[]): string | null {
+	const result = spawnSync(command, args, { stdio: "pipe" });
+	if (!result.error && result.status === 0) {
+		return null;
+	}
+	return `${command}: ${formatSpawnFailure(result)}`;
+}
+
+function extractTarGzArchive(archivePath: string, extractDir: string, assetName: string): void {
+	const failure = runExtractionCommand("tar", ["xzf", archivePath, "-C", extractDir]);
+	if (failure) {
+		throw new Error(`Failed to extract ${assetName}: ${failure}`);
+	}
+}
+
+function getWindowsTarCommand(): string {
+	const systemRoot = process.env.SystemRoot ?? process.env.WINDIR;
+	if (systemRoot) {
+		const systemTar = join(systemRoot, "System32", "tar.exe");
+		if (existsSync(systemTar)) {
+			return systemTar;
+		}
+	}
+	return "tar.exe";
+}
+
+function extractZipArchive(archivePath: string, extractDir: string, assetName: string): void {
+	const failures: string[] = [];
+
+	if (platform() === "win32") {
+		// Windows ships bsdtar as tar.exe, which supports zip files. Prefer the
+		// System32 binary over Git Bash's GNU tar, which does not handle zip archives.
+		const tarFailure = runExtractionCommand(getWindowsTarCommand(), ["xf", archivePath, "-C", extractDir]);
+		if (!tarFailure) return;
+		failures.push(tarFailure);
+
+		const script =
+			"& { param($archive, $destination) $ErrorActionPreference = 'Stop'; Expand-Archive -LiteralPath $archive -DestinationPath $destination -Force }";
+		const powershellFailure = runExtractionCommand("powershell.exe", [
+			"-NoLogo",
+			"-NoProfile",
+			"-NonInteractive",
+			"-ExecutionPolicy",
+			"Bypass",
+			"-Command",
+			script,
+			archivePath,
+			extractDir,
+		]);
+		if (!powershellFailure) return;
+		failures.push(powershellFailure);
+	} else {
+		const unzipFailure = runExtractionCommand("unzip", ["-q", archivePath, "-d", extractDir]);
+		if (!unzipFailure) return;
+		failures.push(unzipFailure);
+
+		const tarFailure = runExtractionCommand("tar", ["xf", archivePath, "-C", extractDir]);
+		if (!tarFailure) return;
+		failures.push(tarFailure);
+	}
+
+	throw new Error(`Failed to extract ${assetName}: ${failures.join("; ")}`);
+}
+
 // Download and install a tool
-async function downloadTool(tool: "fd" | "rg"): Promise<string> {
+async function downloadTool(tool: ToolKey): Promise<string> {
 	const config = TOOLS[tool];
-	if (!config) throw new Error(`Unknown tool: ${tool}`);
 
 	const plat = platform();
 	const architecture = arch();
 
-	// Get latest version
-	const version = await getLatestVersion(config.repo);
-
-	// Get asset name for this platform
-	const assetName = config.getAssetName(version, plat, architecture);
-	if (!assetName) {
+	if (!config.getAssetName("", plat, architecture)) {
 		throw new Error(`Unsupported platform: ${plat}/${architecture}`);
 	}
+	const releaseAsset = await getReleaseAsset(tool, plat, architecture);
 
 	// Create tools directory
 	mkdirSync(TOOLS_DIR, { recursive: true });
 
-	const downloadUrl = `https://github.com/${config.repo}/releases/download/${config.tagPrefix}${version}/${assetName}`;
+	const downloadUrl = releaseAsset.downloadUrl;
+	const assetName = releaseAsset.assetName;
 	const archivePath = join(TOOLS_DIR, assetName);
 	const binaryExt = plat === "win32" ? ".exe" : "";
 	const binaryPath = join(TOOLS_DIR, config.binaryName + binaryExt);
@@ -197,13 +322,9 @@ async function downloadTool(tool: "fd" | "rg"): Promise<string> {
 
 	try {
 		if (assetName.endsWith(".tar.gz")) {
-			const extractResult = spawnSync("tar", ["xzf", archivePath, "-C", extractDir], { stdio: "pipe" });
-			if (extractResult.error || extractResult.status !== 0) {
-				const errMsg = extractResult.error?.message ?? extractResult.stderr?.toString().trim() ?? "unknown error";
-				throw new Error(`Failed to extract ${assetName}: ${errMsg}`);
-			}
+			extractTarGzArchive(archivePath, extractDir, assetName);
 		} else if (assetName.endsWith(".zip")) {
-			await extractZip(archivePath, { dir: extractDir });
+			extractZipArchive(archivePath, extractDir, assetName);
 		} else {
 			throw new Error(`Unsupported archive format: ${assetName}`);
 		}

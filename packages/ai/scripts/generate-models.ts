@@ -240,6 +240,13 @@ function applyThinkingLevelMetadata(model: Model<any>): void {
 	if (model.provider === "openai-codex" && model.id === "gpt-5.1-codex-mini") {
 		mergeThinkingLevelMap(model, { minimal: "medium", low: "medium", medium: "medium", high: "high" });
 	}
+	if (model.provider === "openrouter" && model.id.startsWith("inception/mercury-2")) {
+		// Mercury 2 in instant mode (reasoning_effort: "none") disables tool calling.
+		// Mark "off" unsupported so the openai-completions provider omits the reasoning param
+		// instead of defaulting to {reasoning:{effort:"none"}} (see openai-completions.ts:575).
+		// Pi's low/medium/high pass through verbatim; OpenRouter normalizes to Mercury's vocabulary.
+		mergeThinkingLevelMap(model, { off: null });
+	}
 }
 
 function getAnthropicMessagesCompat(provider: string, modelId: string): AnthropicMessagesCompat | undefined {
@@ -1613,25 +1620,100 @@ async function generateModels() {
 	];
 	allModels.push(...codexModels);
 
-	// Add missing Grok models
-	if (!allModels.some(m => m.provider === "xai" && m.id === "grok-code-fast-1")) {
-		allModels.push({
+	// Add missing Grok models (xAI provider)
+	const missingGrokModels = [
+		{
 			id: "grok-code-fast-1",
 			name: "Grok Code Fast 1",
-			api: "openai-completions",
-			baseUrl: "https://api.x.ai/v1",
-			provider: "xai",
 			reasoning: false,
 			input: ["text"],
-			cost: {
-				input: 0.2,
-				output: 1.5,
-				cacheRead: 0.02,
-				cacheWrite: 0,
-			},
+			cost: { input: 0.2, output: 1.5, cacheRead: 0.02, cacheWrite: 0 },
 			contextWindow: 32768,
 			maxTokens: 8192,
-		});
+		},
+		{
+			id: "grok-3",
+			name: "Grok 3",
+			reasoning: false,
+			input: ["text"],
+			cost: { input: 3, output: 15, cacheRead: 0.75, cacheWrite: 0 },
+			contextWindow: 131072,
+			maxTokens: 8192,
+		},
+		{
+			id: "grok-3-fast",
+			name: "Grok 3 Fast",
+			reasoning: false,
+			input: ["text"],
+			cost: { input: 5, output: 25, cacheRead: 1.25, cacheWrite: 0 },
+			contextWindow: 131072,
+			maxTokens: 8192,
+		},
+		{
+			id: "grok-3-fast-latest",
+			name: "Grok 3 Fast Latest",
+			reasoning: false,
+			input: ["text"],
+			cost: { input: 5, output: 25, cacheRead: 1.25, cacheWrite: 0 },
+			contextWindow: 131072,
+			maxTokens: 8192,
+		},
+		{
+			id: "grok-3-latest",
+			name: "Grok 3 Latest",
+			reasoning: false,
+			input: ["text"],
+			cost: { input: 3, output: 15, cacheRead: 0.75, cacheWrite: 0 },
+			contextWindow: 131072,
+			maxTokens: 8192,
+		},
+		{
+			id: "grok-3-mini",
+			name: "Grok 3 Mini",
+			reasoning: true,
+			input: ["text"],
+			cost: { input: 0.3, output: 0.5, cacheRead: 0.075, cacheWrite: 0 },
+			contextWindow: 131072,
+			maxTokens: 8192,
+		},
+		{
+			id: "grok-3-mini-fast",
+			name: "Grok 3 Mini Fast",
+			reasoning: true,
+			input: ["text"],
+			cost: { input: 0.6, output: 4, cacheRead: 0.15, cacheWrite: 0 },
+			contextWindow: 131072,
+			maxTokens: 8192,
+		},
+		{
+			id: "grok-3-mini-fast-latest",
+			name: "Grok 3 Mini Fast Latest",
+			reasoning: true,
+			input: ["text"],
+			cost: { input: 0.6, output: 4, cacheRead: 0.15, cacheWrite: 0 },
+			contextWindow: 131072,
+			maxTokens: 8192,
+		},
+		{
+			id: "grok-3-mini-latest",
+			name: "Grok 3 Mini Latest",
+			reasoning: true,
+			input: ["text"],
+			cost: { input: 0.3, output: 0.5, cacheRead: 0.075, cacheWrite: 0 },
+			contextWindow: 131072,
+			maxTokens: 8192,
+		},
+	];
+
+	for (const grokModel of missingGrokModels) {
+		if (!allModels.some((m) => m.provider === "xai" && m.id === grokModel.id)) {
+			allModels.push({
+				...grokModel,
+				api: "openai-completions",
+				baseUrl: "https://api.x.ai/v1",
+				provider: "xai",
+			});
+		}
 	}
 
 	// Add missing Mistral Medium 3.5 model until models.dev includes it

@@ -1,0 +1,136 @@
+# OpenSpec / SDD project context for the Pi monorepo.
+# Created non-destructively to support strict SDD proposal/spec work.
+project:
+  name: pi-monorepo
+  description: >-
+    TypeScript/Node.js monorepo for Pi: AI provider abstraction, generic agent core,
+    coding-agent runtime, terminal UI, and web UI packages.
+  package_manager: npm
+  runtime: node >=20.0.0
+  module_system: esm
+  workspaces:
+    - packages/*
+    - packages/web-ui/example
+    - packages/coding-agent/examples/extensions/with-deps
+    - packages/coding-agent/examples/extensions/custom-provider-anthropic
+    - packages/coding-agent/examples/extensions/custom-provider-gitlab-duo
+    - packages/coding-agent/examples/extensions/sandbox
+
+sdd:
+  strict_tdd: true
+  artifact_store: openspec
+  default_change: pi-cyber-harness
+  phase_rules:
+    init:
+      purpose: Establish project context, test commands, and artifact locations.
+    proposal:
+      requires:
+        - problem statement
+        - goals and non-goals
+        - acceptance criteria
+        - affected package forecast
+        - security and dual-use risk statement
+    spec:
+      requires:
+        - user-visible behavior
+        - explicit SOC, Blue-Team, authorized Red-Team, CTI/OSINT, browser ops, guardrails, and audit boundaries
+        - measurable verification criteria
+    design:
+      requires:
+        - architecture diagram or module map
+        - agent/skill boundaries
+        - data flow and audit model
+        - threat model for dual-use capabilities
+    tasks:
+      requires:
+        - small implementation steps
+        - test-first steps where code changes are planned
+        - review workload estimate
+    apply:
+      requires:
+        - RED/GREEN/REFACTOR evidence for code changes
+        - single-writer edits unless explicitly approved
+    verify:
+      requires:
+        - fresh command output before completion claims
+        - issue creation for failing gates before merge workflow continues
+    archive:
+      requires:
+        - final decisions
+        - verification evidence
+        - follow-up risks
+
+future_change_context:
+  name: Pi Cyber Harness
+  scope: >-
+    Future cybersecurity harness capabilities for Pi/Gentle AI, including SOC,
+    Blue-Team, authorized Red-Team, CTI/OSINT, browser operations, guardrails,
+    approvals, audit trails, and policy boundaries.
+  constraints:
+    - Treat offensive or anti-abuse-evasion capabilities as dual-use and gated.
+    - Keep browser/OSINT tooling behind explicit approvals, logging, and authorized-use policy.
+    - Prefer SDD/OpenSpec artifacts before implementation.
+    - Do not claim completion without fresh verification evidence.
+
+testing:
+  root:
+    check: npm run check
+    test: npm test
+    build: npm run build
+    browser_smoke: npm run check:browser-smoke
+    note: >-
+      Project guidance says npm run check is required after code changes, npm run check does not run tests,
+      and npm test/npm run build should not be run unless explicitly authorized by the user.
+  packages:
+    ai:
+      path: packages/ai
+      test: npm test
+      build: npm run build
+      runner: vitest --run
+    agent:
+      path: packages/agent
+      test: npm test
+      harness_test: npm run test:harness
+      build: npm run build
+      runner: vitest --run
+    coding_agent:
+      path: packages/coding-agent
+      test: npm test
+      build: npm run build
+      runner: vitest --run
+      suite_note: >-
+        For packages/coding-agent/test/suite, use the local harness and faux provider;
+        never use real provider APIs, real API keys, or paid tokens.
+    tui:
+      path: packages/tui
+      test: npm test
+      build: npm run build
+      runner: node --test --import tsx test/*.test.ts
+    web_ui:
+      path: packages/web-ui
+      check: npm run check
+      build: npm run build
+    web_ui_example:
+      path: packages/web-ui/example
+      check: npm run check
+      build: npm run build
+
+quality_gates:
+  documentation_only:
+    required:
+      - Review changed files manually.
+      - Run targeted checks only if documentation generation or formatting tools are changed.
+  code_changes:
+    required:
+      - npm run check
+      - targeted package test command for changed package when instructed/appropriate
+      - fresh review before commit/push/PR for non-trivial code changes
+  e2e:
+    status: not_detected
+    note: >-
+      No dedicated root E2E script was detected in package.json. Define the official E2E gate
+      in a future spec/design before using E2E as a merge requirement.
+
+skill_registry:
+  path: .atl/skill-registry.md
+  status: present

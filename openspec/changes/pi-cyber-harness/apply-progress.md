@@ -150,3 +150,72 @@ packages/web-ui check: passed.
 ### Workload
 
 - Phase 2 remains within a focused PR boundary for audit/evidence helpers plus regression coverage.
+
+## Phase 3: CTI/OSINT preservation adapters
+
+Status: implementation complete; verification gates pass.
+
+### PR boundary
+
+- Branch: `feat/pi-cyber-harness-cti-persistence`
+- Slice: Phase 3 only, CTI/OSINT preservation adapter boundaries
+- Approved issue: https://github.com/rortizs/pi/issues/13
+- Future PR body must include: `Closes #13`
+- Future PR label: exactly one `type:*` label, expected `type:feature`
+
+### Completed tasks
+
+- RED: added CTI/OSINT persistence regression tests before implementation.
+- GREEN: added injected Engram/Obsidian adapter boundaries and explicit `saved`, `skipped`, and `unavailable` result objects.
+- TRIANGULATE: added trusted, unverified, and dual-use resource classification coverage.
+- REFACTOR: normalized note fields as `what`, `why`, `where`, `classification`, `trust`, `dualUseCautions`, and `suggestedUse` with stable literal unions.
+
+### Files changed
+
+- `packages/coding-agent/test/suite/regressions/pi-cyber-harness-persistence.test.ts`
+- `packages/coding-agent/src/core/cyber-harness/persistence.ts`
+- `openspec/changes/pi-cyber-harness/apply-progress.md`
+
+### TDD Cycle Evidence
+
+| Cycle | Phase             | Command                                                                                                                                       | Exit | Evidence                                                                                                                                                          |
+| ----- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1     | RED               | `cd packages/coding-agent && npx tsx ../../node_modules/vitest/dist/cli.js --run test/suite/regressions/pi-cyber-harness-persistence.test.ts` | 1    | Failed before implementation: missing `../../../src/core/cyber-harness/persistence.js`; 1 failed suite, no tests collected.                                       |
+| 1     | GREEN             | same targeted command                                                                                                                         | 0    | 4 tests passed after adding `persistence.ts` with injected Engram/Obsidian adapters and explicit saved/skipped/unavailable statuses.                              |
+| 2     | TRIANGULATE RED   | same targeted command                                                                                                                         | 1    | 1 focused dual-use caution test failed because a dual-use resource with empty cautions did not receive a default authorization caution.                            |
+| 2     | TRIANGULATE GREEN | same targeted command                                                                                                                         | 0    | 5 tests passed after adding the default dual-use authorization caution during note normalization.                                                                  |
+| 3     | REFACTOR VERIFY   | `cd packages/coding-agent && npx tsx ../../node_modules/vitest/dist/cli.js --run test/suite/regressions/pi-cyber-harness-persistence.test.ts` | 0    | 5 tests passed after final formatting/refactor verification.                                                                                                      |
+| 3     | ROOT CHECK        | `npm run check`                                                                                                                               | 0    | First root check passed after Biome fixed 1 file; repeated root check passed with no fixes applied, `tsgo --noEmit` passed, browser smoke passed, web-ui passed. |
+| 3     | DIFF CHECK        | `git diff --check`                                                                                                                            | 0    | No whitespace errors reported.                                                                                                                                    |
+
+### Verification output summary
+
+Targeted regression final run:
+
+```text
+Test Files  1 passed (1)
+Tests  5 passed (5)
+```
+
+Root check final run:
+
+```text
+biome check --write --error-on-warnings .: Checked 665 files; No fixes applied.
+tsgo --noEmit: passed.
+npm run check:browser-smoke: passed.
+packages/web-ui check: passed.
+```
+
+### Deviations from design
+
+- None for Phase 3 scope. The slice only models adapter interfaces and injected fake adapters in tests; it does not call real Engram, Obsidian, provider APIs, browser automation, external targets, or persistence tools.
+- Unverified resources return `skipped` for available adapters and preserve structured fallback note content for later manual review.
+
+### Remaining tasks
+
+- Commit, push, and open a PR after final status review; do not include unrelated local runtime artifacts.
+- Continue with Phase 4 only after Phase 3 PR boundary is accepted/merged.
+
+### Workload
+
+- Phase 3 remains within a focused PR boundary for persistence adapter helpers plus regression coverage.
